@@ -22,14 +22,40 @@
 
 **Переменные:** `PROXMOX_ISO_ROOT` (по умолчанию `~/proxmox_iso`), `PROXMOX_ISO_URL`, `PVE_AUTOINSTALL_SRC`, `PVE_RESTORE_BACKUPS_SRC`, `STACK_SRC_DIR`
 
-### Поиск stack (по умолчанию)
+### Рекомендуемый каталог на машине сборки
 
-`prepare.sh` ищет `stack` в таком порядке:
+Все артефакты, которые не входят в git `iso-maker-2`, держите **на одном уровне** с каталогом клона:
+
+```text
+<workspace>/
+  iso-maker-2/                    # git clone (репозиторий)
+    Custom-iso-maker/
+      prepare.sh
+      build.sh
+  stack/                          # payload для ISO
+  pve-autoinstall.sh
+  pve-restore-backups.sh
+```
+
+То есть `stack`, `pve-autoinstall.sh` и `pve-restore-backups.sh` — **соседи** `iso-maker-2`, не внутри репозитория.
+
+`prepare.sh` вычисляет каталог `LAYOUT_ROOT`: если скрипт лежит в `iso-maker-2/Custom-iso-maker/`, то `LAYOUT_ROOT` = родитель `iso-maker-2`; если `prepare.sh` лежит в корне `iso-maker-2/`, то `LAYOUT_ROOT` = родитель `iso-maker-2` (тот же уровень, что и сам каталог репозитория).
+
+### Поиск stack и pve-скриптов (по умолчанию)
+
+`prepare.sh` ищет в таком порядке:
+
+**pve-autoinstall.sh / pve-restore-backups.sh**
+
+1. `PVE_AUTOINSTALL_SRC` / `PVE_RESTORE_BACKUPS_SRC` (если заданы)
+2. `$LAYOUT_ROOT/pve-autoinstall.sh` и т.д. (рядом с `iso-maker-2`)
+3. внутри репозитория и fallback-пути (`$PWD`, родитель cwd и т.д.)
+
+**stack**
 
 1. `STACK_SRC_DIR` (если задан)
-2. `../stack` (соседняя директория рядом с репозиторием `iso-maker-2`)
-3. `./stack` (внутри репозитория)
-4. fallback-пути рядом со скриптом/текущей директорией
+2. `$LAYOUT_ROOT/stack`
+3. `stack/` внутри репозитория и остальные fallback-пути
 
 ## 2. build.sh
 
@@ -42,8 +68,9 @@
 - Если в `PROXMOX_ISO_ROOT/binaries/` есть обычные файлы — для каждого: `dist/proxmox-<имя_файла>.iso` (бинарь копируется в `/usr/local/sbin/autolxc`).
 - Если `binaries/` пустая — один образ `dist/proxmox-custom.iso` (или `DEFAULT_ISO_NAME`), в `/usr/local/sbin/autolxc` кладётся no-op скрипт, чтобы `autolxc.service` не падал.
 
-**Переменные:** `PROXMOX_ISO_ROOT`, `DIST_DIR`, `DEFAULT_ISO_NAME`  
-Сборка `squashfs` использует `xz` с уровнем сжатия `3` (`-Xcompression-level 3`).
+**Переменные:** `PROXMOX_ISO_ROOT`, `DIST_DIR`, `DEFAULT_ISO_NAME`, `SQUASHFS_OPTS`  
+Сборка `squashfs`: по умолчанию `xz` без `-Xcompression-level` (старые `squashfs-tools` его не поддерживают). Свои опции: `SQUASHFS_OPTS='-comp xz -noappend -no-xattrs -b 1M -Xdict-size 75%' ./build.sh`  
+Сборка ISO выполняется с `xorriso -iso-level 3` (поддержка больших файлов в образе).
 
 ## Порядок работы
 
@@ -63,19 +90,22 @@
 
 ## Запуск на машине сборки (Ubuntu)
 
-1. Перенести скрипты на машину сборки 
+1. Собрать layout: рядом с `iso-maker-2` положить `stack/`, `pve-autoinstall.sh`, `pve-restore-backups.sh` (см. раздел «Рекомендуемый каталог»).
 
 2. Дать право на исполнение:
    ```bash
-   chmod +x prepare.sh build.sh
+   chmod +x iso-maker-2/Custom-iso-maker/prepare.sh iso-maker-2/Custom-iso-maker/build.sh
+   chmod +x pve-autoinstall.sh pve-restore-backups.sh
    ```
 
-3. Запуск (из каталога со скриптами):
+3. Запуск из каталога со скриптами сборки (обычно `iso-maker-2/Custom-iso-maker/`; если `prepare.sh` лежит в корне репозитория — `cd iso-maker-2`):
    ```bash
+   cd iso-maker-2/Custom-iso-maker
    ./prepare.sh
-   # опционально: ~/proxmox_iso/binaries/<файлы для autolxc>
    ./build.sh
    ```
+
+   Опционально: `~/proxmox_iso/binaries/<файлы для autolxc>` — если нужны варианты ISO с разным `autolxc`.
 
    Либо задать корень сборки:
    ```bash

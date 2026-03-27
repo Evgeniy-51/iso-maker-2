@@ -11,6 +11,14 @@ PROXMOX_ISO_URL="${PROXMOX_ISO_URL:-https://enterprise.proxmox.com/iso/proxmox-v
 ISO_FILE="$PROXMOX_ISO_ROOT/proxmox-ve.iso"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# Рекомендуемый layout: рядом с каталогом iso-maker-2 лежат stack/ и pve-*.sh.
+# Если prepare.sh в Custom-iso-maker/, «общий» каталог — родитель iso-maker-2.
+# Если prepare.sh в корне iso-maker-2/, общий каталог — родитель репозитория (тот же уровень, что и iso-maker-2).
+if [[ "$(basename "$SCRIPT_DIR")" == "Custom-iso-maker" ]]; then
+  LAYOUT_ROOT="$(cd "$PROJECT_ROOT/.." && pwd)"
+else
+  LAYOUT_ROOT="$PROJECT_ROOT"
+fi
 
 resolve_script_path() {
   local filename="$1"
@@ -19,6 +27,7 @@ resolve_script_path() {
   cwd_parent="$(cd "$PWD/.." && pwd)"
   local candidates=(
     "$explicit_path"
+    "$LAYOUT_ROOT/$filename"
     "$PROJECT_ROOT/$filename"
     "$SCRIPT_DIR/$filename"
     "$PWD/$filename"
@@ -39,11 +48,9 @@ resolve_stack_path() {
   local explicit_path="${1:-}"
   local cwd_parent
   cwd_parent="$(cd "$PWD/.." && pwd)"
-  local project_parent
-  project_parent="$(cd "$PROJECT_ROOT/.." && pwd)"
   local candidates=(
     "$explicit_path"
-    "$project_parent/stack"
+    "$LAYOUT_ROOT/stack"
     "$PROJECT_ROOT/stack"
     "$SCRIPT_DIR/stack"
     "$PWD/stack"
@@ -75,6 +82,7 @@ if [[ -z "$STACK_SRC_DIR" ]]; then
 fi
 
 echo "[prepare] root: $PROXMOX_ISO_ROOT"
+echo "[prepare] layout dir (рядом iso-maker-2, stack, pve-*.sh): $LAYOUT_ROOT"
 
 # Пакеты
 sudo apt-get update
@@ -125,12 +133,12 @@ sudo mkdir -p "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/sbin"
 # Вшиваем post-install скрипты Proxmox в ISO
 if [[ -z "${PVE_AUTOINSTALL_SRC:-}" ]] || [[ ! -f "$PVE_AUTOINSTALL_SRC" ]]; then
   echo "[prepare] error: missing script: pve-autoinstall.sh"
-  echo "[prepare] hint: set env PVE_AUTOINSTALL_SRC=/absolute/path/pve-autoinstall.sh"
+  echo "[prepare] hint: положите файл рядом с iso-maker-2 и stack (каталог $LAYOUT_ROOT) или задайте PVE_AUTOINSTALL_SRC=/absolute/path/pve-autoinstall.sh"
   exit 1
 fi
 if [[ -z "${PVE_RESTORE_BACKUPS_SRC:-}" ]] || [[ ! -f "$PVE_RESTORE_BACKUPS_SRC" ]]; then
   echo "[prepare] error: missing script: pve-restore-backups.sh"
-  echo "[prepare] hint: set env PVE_RESTORE_BACKUPS_SRC=/absolute/path/pve-restore-backups.sh"
+  echo "[prepare] hint: положите файл рядом с iso-maker-2 и stack (каталог $LAYOUT_ROOT) или задайте PVE_RESTORE_BACKUPS_SRC=/absolute/path/pve-restore-backups.sh"
   exit 1
 fi
 sudo cp "$PVE_AUTOINSTALL_SRC" "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/sbin/pve-autoinstall.sh"
@@ -141,8 +149,7 @@ sudo chmod 755 "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/sbin/pve-restore-backu
 # Вшиваем stack payload в ISO (будет развернут в /mnt/stack на первом запуске)
 if [[ ! -d "$STACK_SRC_DIR" ]]; then
   echo "[prepare] error: missing stack dir: $STACK_SRC_DIR"
-  echo "[prepare] hint: set env STACK_SRC_DIR=/absolute/path/stack"
-  echo "[prepare] hint: default search checks ../stack, ./stack and repo-local stack paths"
+  echo "[prepare] hint: положите каталог stack рядом с iso-maker-2 (ожидается $LAYOUT_ROOT/stack) или задайте STACK_SRC_DIR=/absolute/path/stack"
   exit 1
 fi
 STACK_ISO_DIR="$PROXMOX_ISO_ROOT/squashfs-root/opt/bootstrap-stack"
