@@ -13,13 +13,23 @@
 - Вшивает скрипты:
   - `/usr/local/sbin/pve-autoinstall.sh`
   - `/usr/local/sbin/pve-restore-backups.sh`
+- Вшивает `stack` payload в `/opt/bootstrap-stack` внутри ISO (для bootstrap в `/mnt/stack` на установленной системе)
 - Создаёт и включает (через `multi-user.target.wants`) юниты:
   - `pve-autoinstall.service`
   - `pve-restore-backups.service`
 - Эти два юнита запускаются параллельно после загрузки системы
 - Создаёт папку `binaries/` для исходных бинарников (используется в build.sh)
 
-**Переменные:** `PROXMOX_ISO_ROOT` (по умолчанию `~/proxmox_iso`), `PROXMOX_ISO_URL`
+**Переменные:** `PROXMOX_ISO_ROOT` (по умолчанию `~/proxmox_iso`), `PROXMOX_ISO_URL`, `PVE_AUTOINSTALL_SRC`, `PVE_RESTORE_BACKUPS_SRC`, `STACK_SRC_DIR`
+
+### Поиск stack (по умолчанию)
+
+`prepare.sh` ищет `stack` в таком порядке:
+
+1. `STACK_SRC_DIR` (если задан)
+2. `../stack` (соседняя директория рядом с репозиторием `iso-maker-2`)
+3. `./stack` (внутри репозитория)
+4. fallback-пути рядом со скриптом/текущей директорией
 
 ## 2. build.sh
 
@@ -31,7 +41,8 @@
 
 Цикл по всем файлам в `PROXMOX_ISO_ROOT/binaries/`. Один файл — один образ. Готовые ISO: `dist/proxmox-<имя_файла>.iso` (или `DIST_DIR`).
 
-**Переменные:** `PROXMOX_ISO_ROOT`, `DIST_DIR`
+**Переменные:** `PROXMOX_ISO_ROOT`, `DIST_DIR`  
+Сборка `squashfs` использует `xz` с уровнем сжатия `3` (`-Xcompression-level 3`).
 
 ## Порядок работы
 
@@ -43,6 +54,7 @@
 
 - `pve-autoinstall.sh` и `pve-restore-backups.sh` запускаются автоматически через systemd
 - В `/mnt` используется только `stack`
+- Если `/mnt/stack` отсутствует или пустой, он автоматически bootstrap-ится из `/opt/bootstrap-stack` (вшитого в ISO)
 - Директория бэкапов создаётся автоматически внутри stack: `/mnt/stack/backup`
 - `pve-restore-backups.sh` скачивает backup-архивы в `/mnt/stack/backup` и выполняет `qmrestore`
 

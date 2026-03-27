@@ -9,7 +9,7 @@ set -euo pipefail
 PROXMOX_ISO_ROOT="${PROXMOX_ISO_ROOT:-$HOME/proxmox_iso}"
 BINARIES_DIR="$PROXMOX_ISO_ROOT/binaries"
 DIST_DIR="${DIST_DIR:-$PROXMOX_ISO_ROOT/dist}"
-SQUASHFS_OPTS="-comp xz -noappend -no-xattrs -b 1M"
+SQUASHFS_OPTS="-comp xz -Xcompression-level 3 -noappend -no-xattrs -b 1M"
 ISO_VOLUME_ID="PVE"
 
 build_one() {

@@ -35,6 +35,31 @@ resolve_script_path() {
   return 1
 }
 
+resolve_stack_path() {
+  local explicit_path="${1:-}"
+  local cwd_parent
+  cwd_parent="$(cd "$PWD/.." && pwd)"
+  local project_parent
+  project_parent="$(cd "$PROJECT_ROOT/.." && pwd)"
+  local candidates=(
+    "$explicit_path"
+    "$project_parent/stack"
+    "$PROJECT_ROOT/stack"
+    "$SCRIPT_DIR/stack"
+    "$PWD/stack"
+    "$cwd_parent/stack"
+  )
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    [[ -n "$candidate" ]] || continue
+    if [[ -d "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
 PVE_AUTOINSTALL_SRC="${PVE_AUTOINSTALL_SRC:-}"
 if [[ -z "$PVE_AUTOINSTALL_SRC" ]]; then
   PVE_AUTOINSTALL_SRC="$(resolve_script_path "pve-autoinstall.sh" "" || true)"
@@ -43,6 +68,10 @@ fi
 PVE_RESTORE_BACKUPS_SRC="${PVE_RESTORE_BACKUPS_SRC:-}"
 if [[ -z "$PVE_RESTORE_BACKUPS_SRC" ]]; then
   PVE_RESTORE_BACKUPS_SRC="$(resolve_script_path "pve-restore-backups.sh" "" || true)"
+fi
+STACK_SRC_DIR="${STACK_SRC_DIR:-}"
+if [[ -z "$STACK_SRC_DIR" ]]; then
+  STACK_SRC_DIR="$(resolve_stack_path "" || true)"
 fi
 
 echo "[prepare] root: $PROXMOX_ISO_ROOT"
@@ -108,6 +137,19 @@ sudo cp "$PVE_AUTOINSTALL_SRC" "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/sbin/p
 sudo cp "$PVE_RESTORE_BACKUPS_SRC" "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/sbin/pve-restore-backups.sh"
 sudo chmod 755 "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/sbin/pve-autoinstall.sh"
 sudo chmod 755 "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/sbin/pve-restore-backups.sh"
+
+# Вшиваем stack payload в ISO (будет развернут в /mnt/stack на первом запуске)
+if [[ ! -d "$STACK_SRC_DIR" ]]; then
+  echo "[prepare] error: missing stack dir: $STACK_SRC_DIR"
+  echo "[prepare] hint: set env STACK_SRC_DIR=/absolute/path/stack"
+  echo "[prepare] hint: default search checks ../stack, ./stack and repo-local stack paths"
+  exit 1
+fi
+STACK_ISO_DIR="$PROXMOX_ISO_ROOT/squashfs-root/opt/bootstrap-stack"
+echo "[prepare] embedding stack from: $STACK_SRC_DIR"
+sudo rm -rf "$STACK_ISO_DIR"
+sudo mkdir -p "$STACK_ISO_DIR"
+sudo rsync -a --delete "$STACK_SRC_DIR"/ "$STACK_ISO_DIR"/
 
 # Юнит pve-autoinstall.service в установленной системе
 sudo tee "$PROXMOX_ISO_ROOT/squashfs-root/etc/systemd/system/pve-autoinstall.service" << 'EOF'
