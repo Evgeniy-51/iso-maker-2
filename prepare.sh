@@ -11,8 +11,39 @@ PROXMOX_ISO_URL="${PROXMOX_ISO_URL:-https://enterprise.proxmox.com/iso/proxmox-v
 ISO_FILE="$PROXMOX_ISO_ROOT/proxmox-ve.iso"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PVE_AUTOINSTALL_SRC="$PROJECT_ROOT/pve-autoinstall.sh"
-PVE_RESTORE_BACKUPS_SRC="$PROJECT_ROOT/pve-restore-backups.sh"
+
+resolve_script_path() {
+  local filename="$1"
+  local explicit_path="${2:-}"
+  local cwd_parent
+  cwd_parent="$(cd "$PWD/.." && pwd)"
+  local candidates=(
+    "$explicit_path"
+    "$PROJECT_ROOT/$filename"
+    "$SCRIPT_DIR/$filename"
+    "$PWD/$filename"
+    "$cwd_parent/$filename"
+  )
+  local candidate
+  for candidate in "${candidates[@]}"; do
+    [[ -n "$candidate" ]] || continue
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+PVE_AUTOINSTALL_SRC="${PVE_AUTOINSTALL_SRC:-}"
+if [[ -z "$PVE_AUTOINSTALL_SRC" ]]; then
+  PVE_AUTOINSTALL_SRC="$(resolve_script_path "pve-autoinstall.sh" "" || true)"
+fi
+
+PVE_RESTORE_BACKUPS_SRC="${PVE_RESTORE_BACKUPS_SRC:-}"
+if [[ -z "$PVE_RESTORE_BACKUPS_SRC" ]]; then
+  PVE_RESTORE_BACKUPS_SRC="$(resolve_script_path "pve-restore-backups.sh" "" || true)"
+fi
 
 echo "[prepare] root: $PROXMOX_ISO_ROOT"
 
@@ -63,12 +94,14 @@ sudo ln -sf ../autolxc.service "$PROXMOX_ISO_ROOT/squashfs-root/etc/systemd/syst
 sudo mkdir -p "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/sbin"
 
 # Вшиваем post-install скрипты Proxmox в ISO
-if [[ ! -f "$PVE_AUTOINSTALL_SRC" ]]; then
-  echo "[prepare] error: missing script: $PVE_AUTOINSTALL_SRC"
+if [[ -z "${PVE_AUTOINSTALL_SRC:-}" ]] || [[ ! -f "$PVE_AUTOINSTALL_SRC" ]]; then
+  echo "[prepare] error: missing script: pve-autoinstall.sh"
+  echo "[prepare] hint: set env PVE_AUTOINSTALL_SRC=/absolute/path/pve-autoinstall.sh"
   exit 1
 fi
-if [[ ! -f "$PVE_RESTORE_BACKUPS_SRC" ]]; then
-  echo "[prepare] error: missing script: $PVE_RESTORE_BACKUPS_SRC"
+if [[ -z "${PVE_RESTORE_BACKUPS_SRC:-}" ]] || [[ ! -f "$PVE_RESTORE_BACKUPS_SRC" ]]; then
+  echo "[prepare] error: missing script: pve-restore-backups.sh"
+  echo "[prepare] hint: set env PVE_RESTORE_BACKUPS_SRC=/absolute/path/pve-restore-backups.sh"
   exit 1
 fi
 sudo cp "$PVE_AUTOINSTALL_SRC" "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/sbin/pve-autoinstall.sh"
