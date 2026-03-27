@@ -10,7 +10,9 @@ PROXMOX_ISO_ROOT="${PROXMOX_ISO_ROOT:-$HOME/proxmox_iso}"
 BINARIES_DIR="$PROXMOX_ISO_ROOT/binaries"
 DIST_DIR="${DIST_DIR:-$PROXMOX_ISO_ROOT/dist}"
 DEFAULT_ISO_NAME="${DEFAULT_ISO_NAME:-proxmox-custom.iso}"
-SQUASHFS_OPTS="-comp xz -Xcompression-level 3 -noappend -no-xattrs -b 1M"
+# Portable across squashfs-tools: older mksquashfs has no -Xcompression-level for xz.
+# Override: SQUASHFS_OPTS='-comp xz -noappend -no-xattrs -b 1M -Xdict-size 75%' ./build.sh
+SQUASHFS_OPTS="${SQUASHFS_OPTS:--comp xz -noappend -no-xattrs -b 1M}"
 ISO_VOLUME_ID="PVE"
 
 install_autolxc_noop_stub() {
@@ -32,6 +34,7 @@ pack_and_mkiso() {
   cd "$PROXMOX_ISO_ROOT/extract"
   sudo xorriso -as mkisofs \
     -o "$iso_out" \
+    -iso-level 3 \
     -R -J -V "$ISO_VOLUME_ID" \
     -b boot/grub/i386-pc/eltorito.img \
     -no-emul-boot -boot-load-size 4 -boot-info-table \
