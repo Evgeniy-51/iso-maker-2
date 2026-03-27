@@ -28,10 +28,9 @@
 
 ```text
 <workspace>/
-  iso-maker-2/                    # git clone (репозиторий)
-    Custom-iso-maker/
-      prepare.sh
-      build.sh
+  iso-maker-2/                    # git clone 
+    prepare.sh
+    build.sh
   stack/                          # payload для ISO
   pve-autoinstall.sh
   pve-restore-backups.sh
