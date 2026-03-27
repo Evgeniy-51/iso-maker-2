@@ -1,6 +1,6 @@
 # Сборка кастомных ISO Proxmox VE
 
-Скрипты для сборки кастомных ISO Proxmox VE. Один раз подготавливается база (официальный ISO + squashfs + systemd-юниты), затем для каждого бинарника из папки `binaries/` собирается образ `proxmox-<имя_файла>.iso`.
+Скрипты для сборки кастомных ISO Proxmox VE. Один раз подготавливается база (официальный ISO + squashfs + systemd-юниты). Дальше `build.sh`: если в `binaries/` есть файлы — для каждого собирается `proxmox-<имя_файла>.iso`; если папка пустая — один образ `proxmox-custom.iso` (имя задаётся `DEFAULT_ISO_NAME`), без кастомного `autolxc` ставится no-op stub.
 
 ## 1. prepare.sh
 
@@ -33,21 +33,22 @@
 
 ## 2. build.sh
 
-Сборка ISO по бинарникам из папки `binaries/` (создаётся при prepare):
+Сборка ISO (папка `binaries/` создаётся при `prepare.sh`, но не обязательна):
 
 ```bash
 ./build.sh
 ```
 
-Цикл по всем файлам в `PROXMOX_ISO_ROOT/binaries/`. Один файл — один образ. Готовые ISO: `dist/proxmox-<имя_файла>.iso` (или `DIST_DIR`).
+- Если в `PROXMOX_ISO_ROOT/binaries/` есть обычные файлы — для каждого: `dist/proxmox-<имя_файла>.iso` (бинарь копируется в `/usr/local/sbin/autolxc`).
+- Если `binaries/` пустая — один образ `dist/proxmox-custom.iso` (или `DEFAULT_ISO_NAME`), в `/usr/local/sbin/autolxc` кладётся no-op скрипт, чтобы `autolxc.service` не падал.
 
-**Переменные:** `PROXMOX_ISO_ROOT`, `DIST_DIR`  
+**Переменные:** `PROXMOX_ISO_ROOT`, `DIST_DIR`, `DEFAULT_ISO_NAME`  
 Сборка `squashfs` использует `xz` с уровнем сжатия `3` (`-Xcompression-level 3`).
 
 ## Порядок работы
 
 1. Запустить `./prepare.sh` один раз  
-2. Положить бинарники в `binaries/`  
+2. (Опционально) положить бинарники в `binaries/` для нескольких вариантов ISO с разным `autolxc`  
 3. Запустить `./build.sh` без аргументов  
 
 ## Поведение после установки Proxmox из собранного ISO
@@ -72,7 +73,7 @@
 3. Запуск (из каталога со скриптами):
    ```bash
    ./prepare.sh
-   # положить бинарники в ~/proxmox_iso/binaries/
+   # опционально: ~/proxmox_iso/binaries/<файлы для autolxc>
    ./build.sh
    ```
 
