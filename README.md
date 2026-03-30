@@ -14,10 +14,13 @@
   - `/usr/local/sbin/pve-autoinstall.sh`
   - `/usr/local/sbin/pve-restore-backups.sh`
 - Вшивает `stack` payload в `/opt/bootstrap-stack` внутри ISO (для bootstrap в `/mnt/stack` на установленной системе)
-- Создаёт и включает (через `multi-user.target.wants`) юниты:
+- Создаёт юниты:
   - `pve-autoinstall.service`
   - `pve-restore-backups.service`
-- Эти два юнита запускаются параллельно после загрузки системы
+- Создаёт и включает (через `timers.target.wants`) таймеры:
+  - `pve-autoinstall.timer`
+  - `pve-restore-backups.timer`
+- Эти два таймера запускают скрипты параллельно **после задержки** (по умолчанию 5 минут после boot)
 - Создаёт папку `binaries/` для исходных бинарников (используется в build.sh)
 
 **Переменные:** `PROXMOX_ISO_ROOT` (по умолчанию `~/proxmox_iso`), `PROXMOX_ISO_URL`, `PVE_AUTOINSTALL_SRC`, `PVE_RESTORE_BACKUPS_SRC`, `STACK_SRC_DIR`
@@ -80,6 +83,7 @@
 ## Поведение после установки Proxmox из собранного ISO
 
 - `pve-autoinstall.sh` и `pve-restore-backups.sh` запускаются автоматически через systemd
+- Запуск сделан через `systemd timers`, чтобы дать Proxmox и фоновому apt корректно завершить первый boot
 - В `/mnt` используется только `stack`
 - Если `/mnt/stack` отсутствует или пустой, он автоматически bootstrap-ится из `/opt/bootstrap-stack` (вшитого в ISO)
 - Директория бэкапов создаётся автоматически внутри stack: `/mnt/stack/backup`

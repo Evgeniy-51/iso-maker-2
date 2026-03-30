@@ -162,7 +162,7 @@ sudo rsync -a --delete "$STACK_SRC_DIR"/ "$STACK_ISO_DIR"/
 sudo tee "$PROXMOX_ISO_ROOT/squashfs-root/etc/systemd/system/pve-autoinstall.service" << 'EOF'
 [Unit]
 Description=PVE autoinstall
-After=network-online.target pve-cluster.service
+After=network-online.target pve-cluster.service apt-daily.service apt-daily-upgrade.service
 Wants=network-online.target
 
 [Service]
@@ -171,7 +171,21 @@ ExecStart=/usr/local/sbin/pve-autoinstall.sh
 RemainAfterExit=yes
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=
+EOF
+
+# Таймер для устойчивого старта pve-autoinstall после загрузки
+sudo tee "$PROXMOX_ISO_ROOT/squashfs-root/etc/systemd/system/pve-autoinstall.timer" << 'EOF'
+[Unit]
+Description=Delay start pve-autoinstall
+
+[Timer]
+OnBootSec=5min
+Unit=pve-autoinstall.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
 EOF
 
 # Юнит pve-restore-backups.service в установленной системе
@@ -187,7 +201,21 @@ ExecStart=/usr/local/sbin/pve-restore-backups.sh
 RemainAfterExit=yes
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=
+EOF
+
+# Таймер для устойчивого старта pve-restore-backups после загрузки
+sudo tee "$PROXMOX_ISO_ROOT/squashfs-root/etc/systemd/system/pve-restore-backups.timer" << 'EOF'
+[Unit]
+Description=Delay start pve-restore-backups
+
+[Timer]
+OnBootSec=5min
+Unit=pve-restore-backups.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
 EOF
 
 # Тестовая директория для SCP в контейнер 
@@ -195,7 +223,8 @@ sudo mkdir -p "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/share/autolxc-prod/test
 echo -n "test" | sudo tee "$PROXMOX_ISO_ROOT/squashfs-root/usr/local/share/autolxc-prod/test-dir/test.txt" > /dev/null
 
 # Автостарт сервисов после установки системы
-sudo ln -sf ../pve-autoinstall.service "$PROXMOX_ISO_ROOT/squashfs-root/etc/systemd/system/multi-user.target.wants/pve-autoinstall.service"
-sudo ln -sf ../pve-restore-backups.service "$PROXMOX_ISO_ROOT/squashfs-root/etc/systemd/system/multi-user.target.wants/pve-restore-backups.service"
+sudo mkdir -p "$PROXMOX_ISO_ROOT/squashfs-root/etc/systemd/system/timers.target.wants"
+sudo ln -sf ../pve-autoinstall.timer "$PROXMOX_ISO_ROOT/squashfs-root/etc/systemd/system/timers.target.wants/pve-autoinstall.timer"
+sudo ln -sf ../pve-restore-backups.timer "$PROXMOX_ISO_ROOT/squashfs-root/etc/systemd/system/timers.target.wants/pve-restore-backups.timer"
 
 echo "[prepare] done. Put binaries in $PROXMOX_ISO_ROOT/binaries/ and run build.sh."
